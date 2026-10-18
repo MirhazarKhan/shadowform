@@ -1,0 +1,92 @@
+var THREE=require('three'),spatial=require('./spatial'),ink=require('./graphicNovel');
+var world,scene,metal,trim,floor,glass,black,white,red,blue,yellow,occluders=[],batches={},nodes=[],wallMaterial,fixtures=[],clock=0,gateMesh,coreGate,laserGroup,decorMaterials,backdrop=false;
+exports.bounds=690;exports.boxes=[];exports.depthBoxes=[];exports.nodes=nodes;exports.panels=[{x:116,z:92,kind:'access',label:'Override security door'},{x:-112,z:-182,kind:'laser',label:'Disable laser grid'},{x:0,z:-236,kind:'data',label:'Extract the data key'}];
+exports.start={x:0,y:0,z:278};exports.exit={x:0,y:55,z:-626};
+exports.height=function(x,z){if(z<-350)return 55;if(z<-270&&Math.abs(x)<34)return Math.max(0,Math.min(55,(-z-270)/80*55));if(z<=25&&z>=-48&&Math.abs(x)>101&&Math.abs(x)<133)return Math.max(0,Math.min(26,(25-z)/73*26));if(z<-48&&z>-214&&Math.abs(x)>93&&Math.abs(x)<137)return 26;if(z<-160&&z>-184)return 26;return 0;};
+// Elevated vapor can stand on climbed architecture without changing guard routes.
+exports.supportHeight=function(x,z,maximum){var h=exports.height(x,z);for(var i=0;i<exports.boxes.length;i++){var b=exports.boxes[i],top=b.top===undefined?b.y+b.h:b.top;if(!b.disabled&&b.wall&&!b.gate&&b.w>=7&&b.d>=7&&top<=maximum+.08&&top>h&&Math.abs(x-b.x)<=b.w/2&&Math.abs(z-b.z)<=b.d/2)h=top;}return h;};
+exports.walkable=function(x,z){if(z>324||z<-674||Math.abs(x)>149)return false;if(z<-264&&z>-350&&Math.abs(x)>33)return false;return true;};
+function material(c,panel){return ink.create(c,panel||0);}
+function mesh(g,m,x,y,z,parent){var o=new THREE.Mesh(g,m);o.position.set(x||0,y||0,z||0);o.castShadow=!backdrop;o.receiveShadow=true;(parent||world).add(o);return o;}
+function box(w,h,d,x,y,z,m,block){var o=mesh(new THREE.BoxGeometry(w,h,d),m||metal,x,y+h/2,z);if(block){var volume={x:x,y:y,z:z,w:w,h:h,d:d,wall:true};exports.boxes.push(volume);o.userData.volume=volume;}if(block||m===floor)exports.depthBoxes.push({x:x,y:y,z:z,w:w,h:h,d:d});return o;}
+function emissive(c){return new THREE.MeshBasicMaterial({color:c});}
+function strip(w,x,y,z,color){return box(w,.3,.7,x,y,z,color||blue);}
+function sign(text,x,y,z,rotation){var c=document.createElement('canvas');c.width=512;c.height=128;var ctx=c.getContext('2d');ctx.fillStyle='#19191e';ctx.fillRect(0,0,512,128);ctx.fillStyle='#e5e1d5';ctx.font='900 35px sans-serif';ctx.fillText(text,25,58);ctx.fillStyle='#b84a57';ctx.font='16px monospace';ctx.fillText('A E G I S   /   R E S T R I C T E D',25,91);var t=new THREE.Texture(c);t.needsUpdate=true;var o=mesh(new THREE.PlaneGeometry(43,10.75),new THREE.MeshBasicMaterial({map:t}),x,y,z);o.rotation.y=rotation||0;return o;}
+function wall(w,h,d,x,y,z){var o=box(w,h,d,x,y,z,metal,true);occluders.push(o);return o;}
+function cover(x,y,z,w,h,d){var base=box(w,h,d,x,y,z,black,true);base.userData.volume.top=y+h+.6;box(w+.8,.6,d+.8,x,y+h,z,metal);for(var side=-1;side<=1;side+=2){box(1,h,d+.6,x+side*(w/2-1.5),y,z,trim);for(var j=0;j<Math.floor(h/3);j++)box(w-5,.35,.45,x,y+2+j*3,z+side*(d/2+.2),metal);}strip(Math.max(3,w-7),x,y+h-.7,z+d/2+.5,blue);}
+function pillar(x,y,z,h){wall(9,h,9,x,y,z);box(11,1,11,x,y,z,trim);box(11,1,11,x,y+h-1,z,trim);for(var j=0;j<3;j++)box(.3,h-6,.5,x-3+j*3,y+3,z+4.7,black);strip(6,x,y+h-5,z+4.8,white);}
+function building(x,z,w,h,d){var y=55;var base=box(w,h,d,x,y,z,metal,true);base.userData.volume.top=y+h+1.3;box(w+2,1.3,d+2,x,y+h,z,trim);for(var j=0;j<3;j++){box(w-5,3,.25,x,y+8+j*9,z+d/2+.15,black);strip(w-8,x,y+10+j*9,z+d/2+.35,j===2?yellow:blue);}for(var side=-1;side<=1;side+=2)box(.8,h-4,d+.8,x+side*(w/2-2),y+2,z,trim);box(10,3,12,x,y+h+1.3,z,black,true);mesh(new THREE.CylinderGeometry(.45,.7,17,8),trim,x+w*.3,y+h+9,z);strip(5,x+w*.3,y+h+17,z,red);}
+function fixture(x,y,z,warm){fixtures.push({x:x,y:y,z:z,warm:!!warm});box(15,.6,3,x,y,z,trim);strip(12,x,y-.4,z,warm?yellow:white);}
+function room(z1,z2,height,ceiling){var middle=(z1+z2)/2,length=z1-z2;box(304,1.6,length,0,height-1.6,middle,floor);if(!ceiling){wall(5,7,length,-153,height,middle);wall(5,7,length,153,height,middle);return;}wall(5,53,length,-153,height,middle);wall(5,53,length,153,height,middle);for(var z=z2+15;z<z1;z+=30){for(var x=-150;x<=150;x+=300){var pane=box(.8,35,28,x,height+8,z,wallMaterial);occluders.push(pane);box(2,52,2,x,height,z-15,trim);box(1,.6,29,x,height+6,z,trim);}box(304,3,2,0,height+50,z-15,trim);if(ceiling){box(300,1,29,0,height+53,z,black);exports.depthBoxes.push({x:0,y:height+53,z:z,w:300,h:1,d:29});}for(x=-118;x<150;x+=78)strip(31,x,height+50,z,white);}
+ for(var i=0;i<5;i++){var pipe=mesh(new THREE.CylinderGeometry(1.3,1.3,length,8),trim,-125+i*5,height+46,middle);pipe.rotation.x=Math.PI/2;}
+}
+function node(form,x,z,heading){var y=exports.height(x,z),o=mesh(new THREE.TorusGeometry(8,.13,4,40),new THREE.MeshBasicMaterial({color:0xd8d4c7,transparent:true,opacity:.22,depthWrite:false}),x,y+.15,z);o.rotation.x=Math.PI/2;nodes.push({form:form,x:x,y:y,z:z,heading:heading||0,marker:o,label:['Vapor','Industrial crate','Porcelain vase','Terminal','Fire extinguisher','Cleaning drone','Light fixture'][form]});}
+exports.prop=function(form,unique){var i;var group=new THREE.Object3D();if(!decorMaterials)decorMaterials=[material(0xbdbbb2),new THREE.MeshBasicMaterial({color:0xc5c4b5}),material(0xb23845)];var ceramic=decorMaterials[0],screen=decorMaterials[1],burgundy=decorMaterials[2];
+ function part(g,m,x,y,z){return mesh(g,m,x,y,z,group);}function pbox(w,h,d,x,y,z,m){return part(new THREE.BoxGeometry(w,h,d),m,x,y+h/2,z);}
+ if(form===1){pbox(14,13,14,0,0,0,black);pbox(12,10,14.2,0,1.5,0,metal);for(var a=-1;a<=1;a+=2){pbox(1.4,13.3,14.5,a*5.8,0,0,trim);pbox(14.5,1.4,14.5,0,a<0?0:11.6,0,trim);}pbox(3,.4,.3,0,9,7.2,blue);}
+ if(form===2){var points=[];for(var i=0;i<=24;i++){var y=i/24*19;points.push(new THREE.Vector2(2.2+3.1*Math.sin(y/19*Math.PI),y));}part(new THREE.LatheGeometry(points,28),ceramic);for(i=0;i<4;i++){var o=part(new THREE.TorusGeometry(2.5+2.9*Math.sin((i+1)/5*Math.PI),.12,4,28),trim,0,(i+1)*19/5,0);o.rotation.x=Math.PI/2;}}
+ if(form===3){pbox(11,21,7,0,0,0,black);pbox(9,8,.3,0,11,3.6,screen);pbox(9,1,5,0,8,4,metal);for(i=0;i<4;i++)pbox(7,.17,.5,0,13+i*1.5,3.8,blue);pbox(5,.35,.3,0,3,3.6,white);}
+ if(form===4){part(new THREE.CylinderGeometry(2.6,2.6,11,18),burgundy,0,6,0);part(new THREE.SphereGeometry(2.6,16,8),burgundy,0,11,0).scale.y=.45;pbox(4,.7,1,0,12,0,trim);pbox(3,4,.2,0,5,2.6,white);var hose=part(new THREE.TorusGeometry(2.4,.4,6,14,Math.PI*1.4),black,2,9,0);hose.rotation.y=Math.PI/2;}
+ if(form===5){part(new THREE.CylinderGeometry(7,6.8,3,24),ceramic,0,3,0);part(new THREE.CylinderGeometry(5.7,5.7,.4,24),black,0,4.7,0);pbox(3,.35,.3,0,3.8,6.9,blue);part(new THREE.SphereGeometry(1.4,10,6),trim,0,5.4,0);}
+ if(form===6){pbox(18,4,5,0,9,0,metal);pbox(16,.3,3.5,0,9,0,white);pbox(.4,9,.4,-6,0,0,trim);pbox(.4,9,.4,6,0,0,trim);}
+ if(form===7){var shadow=new THREE.ShaderMaterial({uniforms:{clock:{type:'f',value:0}},vertexShader:'varying vec2 v;void main(){v=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'varying vec2 v;uniform float clock;void main(){vec2 q=v*2.0-1.0;float r=length(q*vec2(1.0,.8));float wave=sin(q.x*16.0+sin(q.y*12.0+clock*.3)*2.0);float a=(1.0-smoothstep(.45,1.0,r))*(.36+wave*.13);gl_FragColor=vec4(.008,.014,.024,a);}',transparent:true,depthWrite:false,side:THREE.DoubleSide});part(new THREE.PlaneGeometry(21,23),shadow,0,11.5,0);}
+ if(unique){var clones={};group.traverse(function(o){if(o.material){var id=o.material.id;if(!clones[id])clones[id]=ink.clone(o.material);o.material=clones[id];}});}return group;};
+exports.init=function(s){var i,j,p,side,x,z;scene=s;world=new THREE.Object3D();scene.add(world);metal=material(0x92918b,28);trim=material(0x3e4046);black=material(0x202126);floor=material(0x6e7374,30);wallMaterial=material(0xaaa79e,28);glass=new THREE.MeshBasicMaterial({color:0xb9bcb7,transparent:true,opacity:.075,depthWrite:false});white=emissive(0xe5e1d5);blue=emissive(0xb7bbae);red=emissive(0xdd3448);yellow=emissive(0xc29d59);
+ room(326,40,0,true);room(40,-265,0,true);room(-350,-676,55,false);wall(302,53,5,0,0,327);wall(302,7,5,0,55,-676);
+ // Doorway and a real gap under the heavy security shutter.
+ [-1,1].forEach(function(a){wall(125,53,6,a*89,0,40);wall(120,53,6,a*92,0,-265);});box(52,15,6,0,38,40,trim);gateMesh=box(52,32,3,0,6,40,metal);exports.door={x:0,y:6,z:40,w:52,h:33,d:3,gate:true};exports.boxes.push(exports.door);exports.depthBoxes.push(exports.door);sign('01 / THE LOBBY',0,43,44);
+ // Reception island and sightline-breaking fluted pillars.
+ box(64,12,15,-43,0,147,black,true);box(66,1.2,17,-43,12,147,wallMaterial);strip(60,-43,2,155,blue);for(var p=0;p<2;p++){var x=p?85:-85;for(var z=80;z<290;z+=105){wall(12,53,12,x,0,z);for(var j=0;j<4;j++)box(.4,42,.5,x-5+j*3,5,z+6.2,trim);}}
+ sign('AEGIS / LOBBY',-96,27,323);sign('AUTHORIZED PERSONNEL',114,29,80,Math.PI/2);
+ // Layered lobby cover leaves the central route open and creates side pockets.
+ [[-56,244],[56,244],[-56,303],[56,303]].forEach(function(p){pillar(p[0],0,p[1],53);});
+ [[-119,279,30,20,26],[119,286,24,20,26],[-55,209,28,13,19],[66,123,25,16,18],[-107,145,25,17,15],[89,308,22,10,15]].forEach(function(c){cover(c[0],0,c[1],c[2],c[3],c[4]);});
+ box(36,30,7,-40,0,85,wallMaterial,true);box(37,1,8,-40,30,85,trim);sign('VISITOR / CHECKPOINT',-40,23,89);
+ for(z=74;z<314;z+=60){box(250,1.6,3,0,45,z,trim);fixture(-100,43,z,false);fixture(100,43,z,true);}
+ for(z=64;z<314;z+=30){box(290,.06,.2,0,.06,z,trim);box(.22,.06,27,-16,.06,z+13,trim);box(.22,.06,27,16,.06,z+13,trim);}
+ // Real textured props, not glowing particle substitutes.
+ [[1,-124,200],[1,-123,217],[2,-70,291],[2,130,122],[4,140,260],[3,-135,65],[5,132,190]].forEach(function(a){var prop=exports.prop(a[0]);prop.position.set(a[1],0,a[2]);world.add(prop);var sizes={1:[14,13,14],2:[10,19,10],3:[11,21,7],4:[6,13,6],5:[14,5,14]}[a[0]],b={x:a[1],y:0,z:a[2],w:sizes[0],h:sizes[1],d:sizes[2]};exports.boxes.push(b);exports.depthBoxes.push(b);});
+ node(1,-114,175);node(2,120,105);node(4,139,224,-Math.PI/2);node(5,109,152);
+ // Floor guides, industrial door panels and interaction consoles.
+ for(z=60;z<318;z+=12){strip(2.4,28,.05,z,blue);strip(2.4,-28,.05,z,blue);}exports.panels.push({x:-112,z:92,kind:'coop',label:'Lobby relay A'},{x:112,z:-182,kind:'coop',label:'Security relay B'});exports.panels.forEach(function(p){p.y=exports.height(p.x,p.z);var prop=exports.prop(3);prop.position.set(p.x,p.y,p.z);world.add(prop);var b={x:p.x,y:p.y,z:p.z,w:11,h:21,d:7};exports.boxes.push(b);exports.depthBoxes.push(b);var m=mesh(new THREE.OctahedronGeometry(.7),blue,p.x,p.y+23,p.z);p.marker=m;});
+ // Server hall: tall aisles, glass fronts, raised galleries and overhead cable trays.
+ for(x=-66;x<=66;x+=33){if(x===0)continue;for(var rack=0;rack<4;rack++){z=[-58,-94,-130,-215][rack];wall(19,35,23,x,0,z);box(19.8,1.2,24,x,34,z,trim);var front=box(16,31,.2,x,2,z+11.7,black);for(j=0;j<12;j++){box(15,.5,.4,x,3+j*2.35,z+12,trim);strip(.6,x-6,4+j*2.35,z+12.2,j%3===0?blue:white);}box(18,32,.15,x,1.5,z+12.6,glass);}}
+ for(var side=-1;side<=1;side+=2){box(42,1.5,170,side*115,24.5,-130,floor);for(z=-65;z>=-205;z-=28){box(.7,14,.7,side*95,26,z,trim);box(.7,.7,28,side*95,40,z-14,trim);}for(j=0;j<15;j++)box(30,1.8,4.85,side*117,j*26/15,22-j*4.85,metal);}
+ box(275,1.5,24,0,24.5,-172,floor);for(side=-1;side<=1;side+=2){box(270,.7,.7,0,40,-172+side*12,trim);for(x=-120;x<=120;x+=30)box(.7,14,.7,x,26,-172+side*12,trim);}
+ sign('02 / DATA CORE',0,43,36,Math.PI);sign('VAULT / 07',0,28,-258);node(3,-107,-110);node(1,52,-35);node(5,35,-194);node(6,114,-152);node(4,-139,-235);node(2,118,-230);
+ // Coolant units, gallery consoles and bridge footings make real hiding spaces.
+ [[-82,-35,16,13,18],[82,-35,16,13,18],[-81,-96,13,21,20],[81,-96,13,21,20],[-81,-204,13,19,18],[81,-204,13,19,18],[-67,-244,23,27,12],[67,-244,23,27,12]].forEach(function(c){cover(c[0],0,c[1],c[2],c[3],c[4]);});
+ [-1,1].forEach(function(side){pillar(side*57,0,-254,49);box(10,24,10,side*72,0,-172,trim,true);cover(side*142,26,-86,9,18,22);cover(side*142,26,-197,10,15,19);for(var z=-35;z>-250;z-=55)fixture(side*83,44,z,false);});
+ for(z=-70;z>-244;z-=58){box(174,2,3,0,44,z,trim);strip(30,0,43.6,z,white);box(290,.06,.2,0,.06,z,trim);}
+ // Laser bars are physical 3D lines at multiple heights. The low vapor route fits under them.
+ laserGroup=new THREE.Object3D();world.add(laserGroup);for(var ly=6;ly<24;ly+=6){var l=box(108,.12,.12,0,ly,-128,red);world.remove(l);laserGroup.add(l);}for(side=-1;side<=1;side+=2)wall(5,24,5,side*55,0,-128);
+ // Stair shaft linking the hubs; roof skyline gives a full spatial view.
+ wall(5,66,87,-37,0,-308);wall(5,66,87,37,0,-308);for(j=0;j<30;j++)box(64,2,2.67,0,j*55/30,-270-j*2.67,metal);strip(55,0,63,-311,white);
+ wall(115,7,4,-93,55,-351);wall(115,7,4,93,55,-351);
+ for(x=-120;x<=120;x+=80){wall(40,21,32,x,55,-457);for(j=0;j<6;j++)box(38,.5,33,x,58+j*2.5,-457,trim);var fan=mesh(new THREE.CylinderGeometry(9,9,1,24),black,x,77,-457);fan.rotation.x=0;}
+ for(z=-386;z>-660;z-=52){wall(4,7,50,-152,55,z);wall(4,7,50,152,55,z);}box(60,.2,60,0,55,-626,trim);var pad=mesh(new THREE.TorusGeometry(25,.45,6,64),blue,0,55.3,-626);pad.rotation.x=Math.PI/2;
+ node(1,-98,-390);node(5,72,-512);node(6,-141,-551);node(3,100,-605);
+ // Service buildings and machinery give the roof a layered skyline and cover.
+ building(-104,-582,56,48,66);building(103,-560,53,38,48);
+ [[-93,-416,24,13,20],[66,-389,27,15,17],[-52,-523,28,9,25],[49,-597,31,10,24],[-124,-483,20,17,15],[125,-640,24,12,18]].forEach(function(c){cover(c[0],55,c[1],c[2],c[3],c[4]);});
+ [-1,1].forEach(function(side){pillar(side*134,55,-399,26);pillar(side*134,55,-513,31);for(var z=-378;z>-655;z-=87){box(1,27,1,side*144,55,z,trim);fixture(side*139,82,z,true);}});
+ for(z=-377;z>-659;z-=26){box(280,.08,.3,0,55.05,z,trim);strip(2.4,30,55.12,z,blue);strip(2.4,-30,55.12,z,blue);}
+ // Distant city, lit windows and clouds. A backdrop beyond the playable roofs.
+ backdrop=true;for(i=0;i<75;i++){var angle=i/75*Math.PI*2,dist=450+Math.random()*550,bh=50+Math.random()*170,bx=Math.sin(angle)*dist,bz=-480+Math.cos(angle)*dist;if(Math.abs(bx)<260&&bz>-780&&bz<450)bx+=bx<0?-340:340;box(32+Math.random()*45,bh,35+Math.random()*40,bx,-5,bz,black);for(j=0;j<bh/15;j++)for(p=0;p<3;p++){if(Math.random()>.35)box(2,3,.15,bx-9+p*9,j*15,bz+23,Math.random()>.2?blue:yellow);}}backdrop=false;
+ var sky=new THREE.Mesh(new THREE.SphereGeometry(2400,32,20),new THREE.ShaderMaterial({vertexShader:'varying vec3 direction;void main(){direction=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:'varying vec3 direction;void main(){vec3 d=normalize(direction);float horizon=pow(1.0-max(0.0,d.y),3.0);vec3 color=mix(vec3(.026,.027,.035),vec3(.20,.20,.21),horizon);float moon=dot(d,normalize(vec3(-.34,.55,-.76)));color+=vec3(.69,.67,.61)*smoothstep(.9994,.99988,moon);color+=vec3(.06,.055,.06)*pow(max(0.0,moon),80.0);vec2 cell=floor(d.xz*1800.0/max(.15,d.y));float star=fract(sin(dot(cell,vec2(12.9898,78.233)))*43758.5453);color+=vec3(.18)*step(.9987,star)*smoothstep(.12,.5,d.y);gl_FragColor=vec4(color,1.0);}',side:THREE.BackSide,depthWrite:false}));sky.frustumCulled=false;scene.add(sky);exports.sky=sky;
+ var sun=new THREE.DirectionalLight(0xe5e1d5,1);sun.position.set(-110,340,250);sun.castShadow=true;sun.shadow.mapSize.width=sun.shadow.mapSize.height=512;sun.shadow.camera.left=-170;sun.shadow.camera.right=170;sun.shadow.camera.top=200;sun.shadow.camera.bottom=-200;sun.shadow.camera.near=2;sun.shadow.camera.far=700;sun.shadow.bias=-.003;world.add(sun);exports.sun=sun;world.add(sun.target);
+ exports.lasers=laserGroup;
+ // Merge repeated static geometry by material and sector. Dynamic objects stay separate.
+ var toRemove=[];world.updateMatrixWorld(true);world.traverse(function(o){if(!o.geometry||!o.geometry.vertices||!o.material||o.material.transparent||(o.material instanceof THREE.ShaderMaterial&&!o.material.inkSurface)||o===gateMesh||o.parent===laserGroup||nodes.some(function(n){return n.marker===o;})||exports.panels.some(function(p){return p.marker===o;}))return;var key=o.material.id+':'+Math.floor(o.matrixWorld.elements[14]/140)+':'+(o.castShadow?1:0);if(!batches[key])batches[key]={geometry:new THREE.Geometry(),material:o.material,shadow:o.castShadow};batches[key].geometry.merge(o.geometry,o.matrixWorld);toRemove.push(o);});toRemove.forEach(function(o){o.parent.remove(o);o.geometry.dispose();});Object.keys(batches).forEach(function(key){var b=batches[key],o=mesh(b.geometry,b.material);o.castShadow=b.shadow;b.geometry.computeBoundingSphere();});
+ world.traverse(function(o){if(o.geometry&&!exports.panels.some(function(p){return p.marker===o;})){o.updateMatrix();o.matrixAutoUpdate=false;}});
+ spatial.build(exports.boxes,exports.depthBoxes);
+ return world;
+};
+exports.setDoor=function(open){exports.door.disabled=open;gateMesh.visible=!open;};
+exports.setLasers=function(enabled){laserGroup.visible=enabled;};
+// Vision reveals threats in a dedicated overlay. World materials stay opaque.
+exports.xray=function(){};
+var nearestFixtures=[null,null,null],fixtureDistances=[Infinity,Infinity,Infinity],lightEnd={x:0,y:0,z:0},lightStart={x:0,y:0,z:0};
+function chooseLights(core){for(var i=0;i<3;i++){nearestFixtures[i]=null;fixtureDistances[i]=Infinity;}for(var j=0;j<fixtures.length;j++){var f=fixtures[j],dx=f.x-core.x,dy=f.y-core.y,dz=f.z-core.z,d=dx*dx+dy*dy+dz*dz;for(i=0;i<3;i++)if(d<fixtureDistances[i]){for(var k=2;k>i;k--){fixtureDistances[k]=fixtureDistances[k-1];nearestFixtures[k]=nearestFixtures[k-1];}fixtureDistances[i]=d;nearestFixtures[i]=f;break;}}}
+exports.illumination=function(core){chooseLights(core);var exposure=core.z<-350?.64:.53;lightEnd.x=core.x;lightEnd.y=core.y+(core.low?2.4:9);lightEnd.z=core.z;for(var i=0;i<3;i++){var f=nearestFixtures[i];if(!f||fixtureDistances[i]>15625)continue;lightStart.x=f.x;lightStart.y=f.y-.5;lightStart.z=f.z;var reach=Math.max(0,1-Math.sqrt(fixtureDistances[i])/125);if(spatial.firstHit(lightStart,lightEnd,0)===Infinity)exposure+=reach*reach*.8;}return Math.min(1.25,exposure);};
+exports.update=function(dt,core){clock+=dt;nodes.forEach(function(n){n.marker.material.opacity=.10+.12*Math.sin(clock*1.5+n.z);n.marker.visible=Math.abs(n.z-core.z)<130;});exports.panels.forEach(function(p){p.marker.rotation.y+=dt;p.marker.position.y=p.y+23+Math.sin(clock*2)*.6;});exports.sun.position.set(core.x-110,core.y+300,core.z+210);exports.sun.target.position.set(core.x,core.y,core.z);};

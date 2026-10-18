@@ -1,0 +1,46 @@
+{
+  "title": "GAME APPLICATION - DEPARTMENT OF SOFTWARE ENGINEERING",
+  "author": "MIRHAZAR KHAN",
+  "published_build": 17,
+  "packaged_date": "2026-10-07",
+  "source_commit": "0996a019bbcfa779376277029534db79450a292c",
+  "hosted_url": "https://spirit-ink-arena.mirhazarkhanchandio.chatgpt.site",
+  "mode": "Solo and 2\u20134 player cooperative heist",
+  "features": [
+    "Four distinct spirit colors using the original GPU curl/facet shaders",
+    "Paired relays, shared data key and whole-crew extraction",
+    "Captured teammate restoration and cover-aware resonance",
+    "Echo lures, route marks and combined x-ray time dilation",
+    "Direct channels, HTTP room fallback, host handoff and cached-session recovery",
+    "Fresh prebuilt assets and portable same-origin LAN server"
+  ],
+  "checks": [
+    "Four-member room API and generated migrations on actual SQLite",
+    "Three independent production bundles in HTTP fallback and deterministic direct-transport modes",
+    "Production-bundle WebGL and WebGPU orchestration, controls and Start transition",
+    "Actual TCP LAN server and exact current asset fingerprints",
+    "Native software WebGPU compute and four-color rendering",
+    "Current native GLES particle shader compilation/linking"
+  ],
+  "limits": [
+    "Actual Internet latency and real-device/browser FPS are not measured",
+    "Hosted page retains private access; use the included LAN launcher for classmates",
+    "One three-hub cooperative prototype, not a measured 1\u20132 hour campaign"
+  ],
+  "sha256": {
+    "app/index.html": "87508a63496149303e586c93855bb7ff0525d7b94c50dec3f9fe7676d4a39371",
+    "app/js/index.js": "3509ec2951c2b4e90a097216c8a0465e2e4d495aba27657afa048402cb0c2176",
+    "dist/index.html": "87508a63496149303e586c93855bb7ff0525d7b94c50dec3f9fe7676d4a39371",
+    "dist/js/index.js": "3509ec2951c2b4e90a097216c8a0465e2e4d495aba27657afa048402cb0c2176",
+    "dist/client/index.html": "87508a63496149303e586c93855bb7ff0525d7b94c50dec3f9fe7676d4a39371",
+    "dist/client/js/index.js": "3509ec2951c2b4e90a097216c8a0465e2e4d495aba27657afa048402cb0c2176",
+    "src/game.js": "8430e30784a3cc717846d153ee88b38a96affed801b99b8dc9f51dc5920c6929",
+    "src/multiplayer.js": "ef33e3c0d36d02d7628cf1810169ad7f96151f7c13cfe5d4e9a37de2c7d4541f",
+    "src/remoteSpirits.js": "84bb7815df38aaa156ab85612d294cd3910b62f63b20ec1ac8f4c050bfc8e1c9",
+    "server/rooms.mjs": "05a76b61ec999459d906e7be4706c693277f3ce32c12394d8830977b7cd7bf59",
+    "dist/server/index.js": "05a76b61ec999459d906e7be4706c693277f3ce32c12394d8830977b7cd7bf59",
+    "tools/serve.cjs": "32c0b958626b1871afab0adf37c8dd638ba343bf671cf66e29ba10ddcf9322c2",
+    "drizzle/0000_clear_the_leader.sql": "0606e14bdd388476d2bcb35eadba24c7d497124d997733de781e69f0df030397",
+    "app/shaders/spirit-render.wgsl": "def3afbe35079473ae2465b775f57b2449f9017b74be7979371f674c37d469db"
+  }
+}
